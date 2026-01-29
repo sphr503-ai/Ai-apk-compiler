@@ -22,6 +22,8 @@ export interface ProvisioningState {
   androidStudio: boolean;
   sdk: boolean;
   avd: boolean;
+  ramLimit: number; // in GB
+  cpuCores: number;
 }
 
 export interface ProjectInfo {
