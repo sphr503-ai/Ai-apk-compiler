@@ -2,18 +2,18 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
 // Access API key from process.env which is shimmed by Vite
-const getApiKey = () => {
+const getApiKey = (manualKey?: string) => {
+  if (manualKey) return manualKey;
   try {
-    // Vite shims process.env via define in vite.config.ts
     return process.env.API_KEY || '';
   } catch (e) {
     return '';
   }
 };
 
-export const analyzeBuildError = async (errorLog: string) => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API_KEY environment variable is not configured.");
+export const analyzeBuildError = async (errorLog: string, manualKey?: string) => {
+  const apiKey = getApiKey(manualKey);
+  if (!apiKey) throw new Error("API_KEY not found. Please provide one.");
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
@@ -43,9 +43,9 @@ export const analyzeBuildError = async (errorLog: string) => {
   return JSON.parse(response.text);
 };
 
-export const generateSelfHealingPythonScript = async () => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API_KEY environment variable is not configured.");
+export const generateSelfHealingPythonScript = async (manualKey?: string) => {
+  const apiKey = getApiKey(manualKey);
+  if (!apiKey) throw new Error("API_KEY not found. Please provide one.");
 
   const ai = new GoogleGenAI({ apiKey });
   const prompt = `Act as an expert Android DevOps engineer. Generate a production-grade Python 3 script named 'heal_build.py' that implements an autonomous "Self-Healing" build pipeline.
@@ -70,9 +70,7 @@ Output ONLY the raw source code. No conversational text, no markdown backticks, 
     throw new Error("AI generation yielded an empty response.");
   }
 
-  // Robust cleaning for common LLM output artifacts
   let cleaned = response.text.trim();
-  // Remove markdown code blocks if present
   cleaned = cleaned.replace(/^```python\n?/gm, '');
   cleaned = cleaned.replace(/^```\n?/gm, '');
   cleaned = cleaned.replace(/\n?```$/gm, '');
