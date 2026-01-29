@@ -4,6 +4,7 @@ import { SystemStatus, LogEntry, ProvisioningState, SourceFile } from './types.t
 import { Terminal } from './components/Terminal.tsx';
 import { SimulatorView } from './components/SimulatorView.tsx';
 import { analyzeBuildError, generateSelfHealingPythonScript } from './services/geminiService.ts';
+import { GoogleGenAI } from "@google/genai";
 import { 
   Cpu, 
   Layers, 
@@ -25,8 +26,16 @@ import {
   Key,
   ChevronRight,
   FileCode,
-  Eye
+  Eye,
+  MessageSquare,
+  Send
 } from 'lucide-react';
+
+interface ChatMessage {
+  role: 'user' | 'agent';
+  text: string;
+  timestamp: string;
+}
 
 const App: React.FC = () => {
   const [status, setStatus] = useState<SystemStatus>(SystemStatus.IDLE);
@@ -42,13 +51,19 @@ const App: React.FC = () => {
   const [inputMode, setInputMode] = useState<'url' | 'upload'>('url');
   const [selfHealingScript, setSelfHealingScript] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'terminal' | 'source'>('terminal');
+  const [activeTab, setActiveTab] = useState<'terminal' | 'source' | 'chat'>('terminal');
   
   // Simulated Source Code
   const [sourceFiles, setSourceFiles] = useState<SourceFile[]>([]);
   const [selectedSourceIndex, setSelectedSourceIndex] = useState(0);
   
-  // API Key state removed as per guidelines. API key is handled via environment variable.
+  // Chat State
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [currentChatMessage, setCurrentChatMessage] = useState('');
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // API Key state handled via environment variable.
   const [downloadProgress, setDownloadProgress] = useState(0);
   const [isPreparingDownload, setIsPreparingDownload] = useState(false);
   
@@ -62,7 +77,6 @@ const App: React.FC = () => {
     }]);
   }, []);
 
-  // Fix: Implemented missing handleFileChange function
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
@@ -70,6 +84,44 @@ const App: React.FC = () => {
       addLog(`Attached local source archive: ${file.name}`, 'info');
     }
   }, [addLog]);
+
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages]);
+
+  // Handle User Chat Input
+  const sendChatMessage = async () => {
+    if (!currentChatMessage.trim() || isChatLoading) return;
+
+    const userMsg = currentChatMessage.trim();
+    const timestamp = new Date().toLocaleTimeString();
+    setChatMessages(prev => [...prev, { role: 'user', text: userMsg, timestamp }]);
+    setCurrentChatMessage('');
+    setIsChatLoading(true);
+
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-pro-preview',
+        contents: `You are an Autonomous Android Engineer Agent. You are currently in a build pipeline (Status: ${status}).
+        User Guidance: "${userMsg}"
+        Current Log State: ${logs.slice(-5).map(l => l.message).join(' | ')}
+        
+        Respond as an engineer who is implementing this guidance into the current build or explaining how it affects the project.`,
+        config: {
+          systemInstruction: "You are a professional, highly technical Android Software Engineer. Keep responses concise and focused on code, builds, and engineering logic."
+        }
+      });
+
+      const agentText = response.text || "Instruction received. Updating build parameters.";
+      setChatMessages(prev => [...prev, { role: 'agent', text: agentText, timestamp: new Date().toLocaleTimeString() }]);
+      addLog(`User Guidance processed: ${userMsg.substring(0, 30)}...`, 'ai');
+    } catch (err) {
+      setChatMessages(prev => [...prev, { role: 'agent', text: "Connectivity error. I'm still processing your previous instructions.", timestamp: new Date().toLocaleTimeString() }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
 
   // Simulate Download Progress once build is completed
   useEffect(() => {
@@ -116,7 +168,6 @@ const App: React.FC = () => {
   };
 
   const startPipeline = async () => {
-    // Removed API Key check; process.env.API_KEY is assumed to be configured.
     if ((inputMode === 'url' && !projectUrl) || (inputMode === 'upload' && !selectedFile)) {
       addLog('Error: Source input required.', 'error');
       return;
@@ -127,7 +178,6 @@ const App: React.FC = () => {
     const maxRetries = 3;
     let isStable = false;
 
-    // Step 1: Code Generation Phase
     setStatus(SystemStatus.GENERATING_CODE);
     addLog('✦ Agent: Designing application architecture layers...', 'ai');
     await new Promise(r => setTimeout(r, 2000));
@@ -162,7 +212,6 @@ const App: React.FC = () => {
         setStatus(SystemStatus.SELF_HEALING);
         addLog('✦ Agent: Analyzing build.gradle for AGP 8.0 compatibility...', 'ai');
         
-        // Simulate patching the file
         await new Promise(r => setTimeout(r, 1500));
         setSourceFiles(prev => prev.map(f => f.name === 'build.gradle' ? {
           ...f,
@@ -190,7 +239,6 @@ const App: React.FC = () => {
         setStatus(SystemStatus.SELF_HEALING);
         addLog('✦ Agent: Optimization needed for low-memory (2GB) hardware...', 'ai');
         
-        // Simulate patching for performance
         await new Promise(r => setTimeout(r, 1500));
         setSourceFiles(prev => prev.map(f => f.name === 'MainActivity.kt' ? {
           ...f,
@@ -209,7 +257,7 @@ const App: React.FC = () => {
 
     if (isStable) {
       setStatus(SystemStatus.COMPLETED);
-      addLog('Pipeline fully verified. APK ready for local deployment. (you can download by clicking on download button)', 'success');
+      addLog('Pipeline fully verified. APK ready for local deployment.', 'success');
       setActiveTab('terminal');
     } else {
       setStatus(SystemStatus.FAILED);
@@ -219,20 +267,13 @@ const App: React.FC = () => {
 
   const handleDownload = () => {
     if (downloadProgress < 100) return;
-    
-    // Create a much larger "realistic" dummy binary (approx 5MB)
     const size = 5 * 1024 * 1024; 
     const buffer = new ArrayBuffer(size);
     const view = new DataView(buffer);
-    
-    // Fake APK Headers (PK...)
     view.setUint32(0, 0x504B0304); 
-    
-    // Fill with some dummy data to ensure size
     for (let i = 4; i < size; i++) {
       view.setUint8(i, Math.floor(Math.random() * 256));
     }
-    
     const blob = new Blob([buffer], { type: 'application/vnd.android.package-archive' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -241,7 +282,6 @@ const App: React.FC = () => {
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
     addLog('APK Binary (5.0MB) successfully saved to local storage.', 'success');
   };
 
@@ -262,13 +302,17 @@ const App: React.FC = () => {
         </div>
 
         <nav className="flex-1 p-6 space-y-2">
-          <button className="w-full flex items-center gap-3 px-4 py-3 text-sm font-bold text-white bg-zinc-800/80 border border-zinc-700/50 rounded-2xl">
+          <button onClick={() => setActiveTab('terminal')} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-2xl transition-all ${activeTab === 'terminal' ? 'text-white bg-zinc-800/80 border border-zinc-700/50' : 'text-zinc-500 hover:text-white'}`}>
             <Layers className="w-5 h-5 text-cyan-400" />
             Control Center
           </button>
           <button onClick={() => setActiveTab('source')} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-2xl transition-all ${activeTab === 'source' ? 'text-white bg-zinc-800/50' : 'text-zinc-500 hover:text-white'}`}>
             <FileCode className="w-5 h-5" />
             Source Files
+          </button>
+          <button onClick={() => setActiveTab('chat')} className={`w-full flex items-center gap-3 px-4 py-3 text-sm font-bold rounded-2xl transition-all ${activeTab === 'chat' ? 'text-white bg-zinc-800/50' : 'text-zinc-500 hover:text-white'}`}>
+            <MessageSquare className="w-5 h-5" />
+            Chat with Agent
           </button>
         </nav>
 
@@ -313,7 +357,6 @@ const App: React.FC = () => {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-10 mb-32">
-          {/* Editor/Log Section */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-[#121214] border border-zinc-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
               <div className="flex items-center justify-between mb-8">
@@ -366,6 +409,9 @@ const App: React.FC = () => {
                   <button onClick={() => setActiveTab('source')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'source' ? 'bg-zinc-800 text-cyan-400' : 'text-zinc-500'}`}>
                     <Code className="w-3 h-3" /> Source Editor
                   </button>
+                  <button onClick={() => setActiveTab('chat')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black uppercase transition-all ${activeTab === 'chat' ? 'bg-zinc-800 text-cyan-400' : 'text-zinc-500'}`}>
+                    <MessageSquare className="w-3 h-3" /> Chat
+                  </button>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-1 bg-black rounded-full border border-zinc-800">
                    <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
@@ -373,11 +419,10 @@ const App: React.FC = () => {
                 </div>
               </div>
               
-              <div className="h-[450px] overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl">
-                {activeTab === 'terminal' ? (
-                  <Terminal logs={logs} />
-                ) : (
-                  <div className="flex h-full bg-[#0d0d0f] font-mono text-[12px]">
+              <div className="h-[450px] overflow-hidden rounded-3xl border border-zinc-800 shadow-2xl flex flex-col bg-[#0d0d0f]">
+                {activeTab === 'terminal' && <Terminal logs={logs} />}
+                {activeTab === 'source' && (
+                  <div className="flex h-full font-mono text-[12px]">
                     <div className="w-48 border-r border-zinc-800 p-4 space-y-1">
                       {sourceFiles.map((file, i) => (
                         <button key={i} onClick={() => setSelectedSourceIndex(i)} className={`w-full text-left px-3 py-2 rounded-lg truncate ${selectedSourceIndex === i ? 'bg-cyan-600/10 text-cyan-400 border border-cyan-400/20' : 'text-zinc-600 hover:text-zinc-400'}`}>
@@ -386,12 +431,56 @@ const App: React.FC = () => {
                       ))}
                     </div>
                     <div className="flex-1 p-6 overflow-auto relative">
-                       <div className="absolute top-4 right-6 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded text-[9px] text-zinc-500 font-bold uppercase tracking-widest">
-                         Read/Write
-                       </div>
-                       <pre className="text-zinc-300 leading-relaxed">
-                         {sourceFiles[selectedSourceIndex]?.content || "// Awaiting code injection..."}
-                       </pre>
+                       <div className="absolute top-4 right-6 px-3 py-1 bg-zinc-900 border border-zinc-800 rounded text-[9px] text-zinc-500 font-bold uppercase tracking-widest">Read/Write</div>
+                       <pre className="text-zinc-300 leading-relaxed">{sourceFiles[selectedSourceIndex]?.content || "// Awaiting code injection..."}</pre>
+                    </div>
+                  </div>
+                )}
+                {activeTab === 'chat' && (
+                  <div className="flex flex-col h-full">
+                    <div className="flex-1 overflow-y-auto p-6 space-y-4">
+                      {chatMessages.length === 0 && (
+                        <div className="flex flex-col items-center justify-center h-full text-zinc-600 opacity-50 space-y-4">
+                          <MessageSquare className="w-12 h-12" />
+                          <p className="text-xs font-bold uppercase tracking-widest">No active conversation</p>
+                        </div>
+                      )}
+                      {chatMessages.map((msg, i) => (
+                        <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} animate-fade-in`}>
+                          <div className={`max-w-[80%] rounded-2xl px-4 py-3 ${msg.role === 'user' ? 'bg-cyan-600 text-white' : 'bg-zinc-800 text-zinc-200'} shadow-lg`}>
+                            <p className="text-sm leading-relaxed">{msg.text}</p>
+                            <span className="text-[8px] opacity-40 mt-1 block font-bold">{msg.timestamp} • {msg.role.toUpperCase()}</span>
+                          </div>
+                        </div>
+                      ))}
+                      {isChatLoading && (
+                        <div className="flex justify-start animate-pulse">
+                          <div className="bg-zinc-800 rounded-2xl px-4 py-3 flex gap-2 items-center">
+                            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
+                            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay: '200ms'}}></div>
+                            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-bounce" style={{animationDelay: '400ms'}}></div>
+                          </div>
+                        </div>
+                      )}
+                      <div ref={chatEndRef} />
+                    </div>
+                    <div className="p-4 bg-black/40 border-t border-zinc-800">
+                      <div className="flex gap-2">
+                        <input 
+                          type="text" 
+                          value={currentChatMessage}
+                          onChange={(e) => setCurrentChatMessage(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && sendChatMessage()}
+                          placeholder="Guide the AI: 'Use Jetpack Compose', 'Optimize for SDK 34'..."
+                          className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-3 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/30"
+                        />
+                        <button 
+                          onClick={sendChatMessage}
+                          className="p-3 bg-cyan-600 hover:bg-cyan-500 rounded-xl transition-all active:scale-95 shadow-lg shadow-cyan-600/20"
+                        >
+                          <Send className="w-5 h-5 text-white" />
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -399,7 +488,6 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          {/* Device Simulator Section */}
           <div className="space-y-8">
             <div className="bg-[#121214] border border-zinc-800 rounded-3xl p-8 shadow-2xl h-full flex flex-col min-h-[700px]">
               <div className="flex items-center justify-between mb-8">
@@ -412,42 +500,24 @@ const App: React.FC = () => {
                   <span className="text-[10px] text-red-600 font-black uppercase tracking-widest">Live Feed</span>
                 </div>
               </div>
-              
               <div className="flex-1 bg-zinc-950 rounded-3xl border border-zinc-800 flex items-center justify-center relative overflow-hidden group shadow-inner">
                 <SimulatorView status={status} />
-                <div className="absolute top-6 left-6 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 px-3 py-1.5 rounded-xl border border-zinc-800 backdrop-blur-md">
-                   <p className="text-[9px] font-bold text-cyan-500">RES: 1080x2400</p>
-                   <p className="text-[9px] font-bold text-yellow-500">RAM: 1.2GB/2.0GB</p>
-                </div>
               </div>
-              
               <div className="mt-10">
                 {status === SystemStatus.COMPLETED ? (
                   <div className="space-y-5 animate-fade-in">
-                    <button 
-                      onClick={handleDownload}
-                      disabled={downloadProgress < 100}
-                      className={`relative w-full overflow-hidden rounded-2xl py-6 font-black text-sm flex items-center justify-center gap-3 transition-all transform ${downloadProgress >= 100 ? 'bg-green-600 hover:bg-green-500 shadow-2xl shadow-green-600/40 hover:-translate-y-1' : 'bg-zinc-800 cursor-progress'}`}
-                    >
-                      {downloadProgress < 100 && (
-                        <div className="absolute inset-0 bg-cyan-600/20 transition-all" style={{ width: `${downloadProgress}%` }} />
-                      )}
+                    <button onClick={handleDownload} disabled={downloadProgress < 100} className={`relative w-full overflow-hidden rounded-2xl py-6 font-black text-sm flex items-center justify-center gap-3 transition-all transform ${downloadProgress >= 100 ? 'bg-green-600 hover:bg-green-500 shadow-2xl shadow-green-600/40 hover:-translate-y-1' : 'bg-zinc-800 cursor-progress'}`}>
+                      {downloadProgress < 100 && <div className="absolute inset-0 bg-cyan-600/20 transition-all" style={{ width: `${downloadProgress}%` }} />}
                       <Download className="w-6 h-6 relative z-10" />
-                      <span className="relative z-10">
-                        {downloadProgress < 100 ? `SYNCING TO LOCAL... ${downloadProgress}%` : "DOWNLOAD FINAL APK"}
-                      </span>
+                      <span className="relative z-10">{downloadProgress < 100 ? `SYNCING TO LOCAL... ${downloadProgress}%` : "DOWNLOAD FINAL APK"}</span>
                     </button>
-                    <div className="flex items-center justify-center gap-2 text-zinc-500">
-                      <CheckCircle className="w-4 h-4 text-green-500" />
-                      <span className="text-[11px] font-black uppercase tracking-widest">SHA-256 Verified Binary</span>
-                    </div>
                   </div>
                 ) : status === SystemStatus.FAILED ? (
                   <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-start gap-4 animate-fade-in">
                     <AlertTriangle className="w-6 h-6 text-red-500 shrink-0" />
                     <div>
                       <p className="text-xs font-black text-red-500 uppercase tracking-widest mb-1">Architecture Fault</p>
-                      <p className="text-xs text-red-200/50 leading-relaxed">Agent encountered fatal memory pressure on 2GB smartphone hardware. Optimization loop aborted.</p>
+                      <p className="text-xs text-red-200/50 leading-relaxed">Agent encountered fatal memory pressure. Guide the agent via Chat to optimize.</p>
                     </div>
                   </div>
                 ) : (
@@ -461,7 +531,6 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Floating Global Status */}
       <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-10 py-5 bg-[#18181b]/95 backdrop-blur-2xl border border-white/10 rounded-3xl flex items-center gap-8 shadow-[0_30px_60px_-15px_rgba(0,0,0,0.8)] z-50 animate-fade-in">
         <div className="flex items-center gap-4">
           <div className={`w-3.5 h-3.5 rounded-full shadow-[0_0_15px] ${
@@ -474,12 +543,11 @@ const App: React.FC = () => {
         </div>
         <div className="w-px h-8 bg-white/10"></div>
         <div className="text-xs text-zinc-400 font-bold tracking-tight min-w-[300px]">
-          {status === SystemStatus.IDLE && "Awaiting project source injection..."}
-          {status === SystemStatus.GENERATING_CODE && "✦ Agent designing application architecture..."}
+          {status === SystemStatus.IDLE && "Awaiting source injection..."}
+          {status === SystemStatus.GENERATING_CODE && "✦ Agent designing architecture..."}
           {status === SystemStatus.BUILDING && `Autonomous Compilation Cycle ${retryCount + 1}...`}
-          {status === SystemStatus.SELF_HEALING && "✦ Execution fault detected. Agent applying patch..."}
-          {status === SystemStatus.TESTING && "Verifying binary stability on 2GB RAM smartphone..."}
-          {status === SystemStatus.COMPLETED && "App certified and ready for production."}
+          {status === SystemStatus.SELF_HEALING && "✦ Execution fault. Agent applying patch..."}
+          {status === SystemStatus.COMPLETED && "App certified. Download available."}
         </div>
       </div>
     </div>
