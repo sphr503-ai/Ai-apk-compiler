@@ -1,21 +1,11 @@
 
 import { GoogleGenAI, Type } from "@google/genai";
 
-// Access API key from process.env which is shimmed by Vite
-const getApiKey = (manualKey?: string) => {
-  if (manualKey) return manualKey;
-  try {
-    return process.env.API_KEY || '';
-  } catch (e) {
-    return '';
-  }
-};
+// Removed getApiKey helper. API key must be accessed exclusively from process.env.API_KEY.
 
-export const analyzeBuildError = async (errorLog: string, manualKey?: string) => {
-  const apiKey = getApiKey(manualKey);
-  if (!apiKey) throw new Error("API_KEY not found. Please provide one.");
-
-  const ai = new GoogleGenAI({ apiKey });
+export const analyzeBuildError = async (errorLog: string) => {
+  // Use API key directly from process.env.API_KEY as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `As an autonomous Android Software Engineer, analyze this build error and provide a fix.
@@ -40,14 +30,13 @@ export const analyzeBuildError = async (errorLog: string, manualKey?: string) =>
     }
   });
 
+  // response.text is a property, not a method.
   return JSON.parse(response.text);
 };
 
-export const generateSelfHealingPythonScript = async (manualKey?: string) => {
-  const apiKey = getApiKey(manualKey);
-  if (!apiKey) throw new Error("API_KEY not found. Please provide one.");
-
-  const ai = new GoogleGenAI({ apiKey });
+export const generateSelfHealingPythonScript = async () => {
+  // Use API key directly from process.env.API_KEY as per guidelines
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   const prompt = `Act as an expert Android DevOps engineer. Generate a production-grade Python 3 script named 'heal_build.py' that implements an autonomous "Self-Healing" build pipeline.
 
 Technical Requirements:

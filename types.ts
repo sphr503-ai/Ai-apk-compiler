@@ -2,6 +2,7 @@
 export enum SystemStatus {
   IDLE = 'IDLE',
   PROVISIONING = 'PROVISIONING',
+  GENERATING_CODE = 'GENERATING_CODE',
   ANALYZING = 'ANALYZING',
   BUILDING = 'BUILDING',
   SELF_HEALING = 'SELF_HEALING',
@@ -27,4 +28,11 @@ export interface ProjectInfo {
   name: string;
   language: 'Java' | 'Kotlin' | 'Unknown';
   gradleCompatible: boolean;
+}
+
+export interface SourceFile {
+  name: string;
+  path: string;
+  content: string;
+  language: 'kotlin' | 'xml' | 'gradle';
 }
