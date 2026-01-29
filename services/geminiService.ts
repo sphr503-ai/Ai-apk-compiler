@@ -4,6 +4,7 @@ import { GoogleGenAI, Type } from "@google/genai";
 // Access API key from process.env which is shimmed by Vite
 const getApiKey = () => {
   try {
+    // Vite shims process.env via define in vite.config.ts
     return process.env.API_KEY || '';
   } catch (e) {
     return '';
@@ -12,17 +13,17 @@ const getApiKey = () => {
 
 export const analyzeBuildError = async (errorLog: string) => {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API_KEY not found in environment");
+  if (!apiKey) throw new Error("API_KEY environment variable is not configured.");
 
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `As an autonomous Android Software Engineer, analyze this build error and provide a fix.
     
-    Error Log:
+    Error Context:
     ${errorLog}
     
-    Return your response in JSON format.`,
+    Format your response in JSON according to the schema.`,
     config: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -44,21 +45,21 @@ export const analyzeBuildError = async (errorLog: string) => {
 
 export const generateSelfHealingPythonScript = async () => {
   const apiKey = getApiKey();
-  if (!apiKey) throw new Error("API_KEY not found in environment");
+  if (!apiKey) throw new Error("API_KEY environment variable is not configured.");
 
   const ai = new GoogleGenAI({ apiKey });
-  const prompt = `Act as an expert Android DevOps engineer. Generate a production-ready Python script that implements an autonomous "Self-Healing" build pipeline.
+  const prompt = `Act as an expert Android DevOps engineer. Generate a production-grade Python 3 script named 'heal_build.py' that implements an autonomous "Self-Healing" build pipeline.
 
-The script must:
-1. Attempt to build an Android project using './gradlew assembleDebug'.
-2. Capture stdout and stderr of the process.
-3. If the build fails, parse the error output.
-4. Include a robust retry loop (maximum 3 attempts).
-5. Add a clear placeholder comment for where an LLM (like Gemini) would be invoked to analyze the build error and suggest file modifications.
-6. Use standard Python libraries (os, subprocess, sys).
-7. Be well-commented and clean.
+Technical Requirements:
+1. Orchestrate './gradlew assembleDebug' using subprocess.
+2. Capture and process both stdout and stderr.
+3. If build fails (retCode != 0), extract the relevant error block.
+4. Implement a 3-attempt retry loop.
+5. Include structured comments/placeholders for where a Large Language Model (LLM) API would be integrated to analyze the error logs and apply targeted file modifications.
+6. Use only Python Standard Library (os, subprocess, sys, re, time).
+7. Ensure error handling is robust (e.g., if gradlew is missing permissions).
 
-Output ONLY the Python code. No introductory text or markdown formatting.`;
+Output ONLY the raw source code. No conversational text, no markdown backticks, no markdown formatting.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
@@ -66,9 +67,15 @@ Output ONLY the Python code. No introductory text or markdown formatting.`;
   });
 
   if (!response.text) {
-    throw new Error("Empty response from AI");
+    throw new Error("AI generation yielded an empty response.");
   }
 
-  // Basic cleanup in case markdown blocks were added despite instructions
-  return response.text.replace(/```python/g, '').replace(/```/g, '').trim();
+  // Robust cleaning for common LLM output artifacts
+  let cleaned = response.text.trim();
+  // Remove markdown code blocks if present
+  cleaned = cleaned.replace(/^```python\n?/gm, '');
+  cleaned = cleaned.replace(/^```\n?/gm, '');
+  cleaned = cleaned.replace(/\n?```$/gm, '');
+  
+  return cleaned;
 };

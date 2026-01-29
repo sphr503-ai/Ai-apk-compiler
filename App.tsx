@@ -19,7 +19,8 @@ import {
   Upload,
   Link as LinkIcon,
   FileArchive,
-  X
+  X,
+  AlertTriangle
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -48,112 +49,116 @@ const App: React.FC = () => {
 
   const runProvisioning = async () => {
     setStatus(SystemStatus.PROVISIONING);
-    addLog('Starting System Provisioning Phase 1...', 'warning');
+    addLog('Initiating cloud instance provisioning...', 'warning');
     
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
     setProvisioning(p => ({ ...p, java: true }));
-    addLog('JAVA_HOME set to /usr/lib/jvm/java-17-openjdk-amd64', 'success');
-    
-    await new Promise(r => setTimeout(r, 1500));
-    setProvisioning(p => ({ ...p, androidStudio: true }));
-    addLog('Android Studio installed to /opt/android-studio', 'success');
+    addLog('JAVA_HOME installed: openjdk-17-jdk', 'success');
     
     await new Promise(r => setTimeout(r, 1200));
-    setProvisioning(p => ({ ...p, sdk: true }));
-    addLog('Android SDK Platforms and Build-Tools detected', 'success');
+    setProvisioning(p => ({ ...p, androidStudio: true }));
+    addLog('Android Studio stable binaries deployed to /opt/android-studio', 'success');
     
-    await new Promise(r => setTimeout(r, 1800));
+    await new Promise(r => setTimeout(r, 1000));
+    setProvisioning(p => ({ ...p, sdk: true }));
+    addLog('Command-line tools & build-tools (34.0.0) synchronized', 'success');
+    
+    await new Promise(r => setTimeout(r, 1500));
     setProvisioning(p => ({ ...p, avd: true }));
-    addLog('AVD "TestDevice" created (2GB RAM, x86_64)', 'success');
+    addLog('AVD "TestDevice" successfully initialized (x86_64, Hardware Accel)', 'success');
     
     setStatus(SystemStatus.IDLE);
-    addLog('System ready for project input.', 'info');
+    addLog('Environment Ready. Awaiting project instructions.', 'info');
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && file.name.endsWith('.zip')) {
-      setSelectedFile(file);
-      addLog(`File selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
-    } else if (file) {
-      addLog('Error: Please select a valid .zip project archive.', 'error');
+    if (file) {
+      if (file.name.toLowerCase().endsWith('.zip')) {
+        setSelectedFile(file);
+        addLog(`Archive loaded: ${file.name} [${(file.size / 1024 / 1024).toFixed(2)} MB]`, 'info');
+      } else {
+        addLog(`Invalid file format: ${file.name}. Please upload a .zip archive.`, 'error');
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
     }
   };
 
   const startPipeline = async () => {
     if (inputMode === 'url' && !projectUrl) {
-      addLog('Error: Please provide a Project URL.', 'error');
+      addLog('Error: Repository URL required.', 'error');
       return;
     }
     if (inputMode === 'upload' && !selectedFile) {
-      addLog('Error: Please upload a ZIP project archive.', 'error');
+      addLog('Error: Project ZIP archive required.', 'error');
       return;
     }
 
     setStatus(SystemStatus.ANALYZING);
     if (inputMode === 'url') {
-      addLog(`Cloning repository: ${projectUrl}`, 'info');
+      addLog(`Connecting to remote source: ${projectUrl}`, 'info');
+      await new Promise(r => setTimeout(r, 1500));
+      addLog('Git clone successful. Repository indexed.', 'success');
     } else {
-      addLog(`Unpacking archive: ${selectedFile?.name}`, 'info');
+      addLog(`Streaming local archive to VPS: ${selectedFile?.name}`, 'info');
+      await new Promise(r => setTimeout(r, 1500));
+      addLog('File integrity verified. Extraction complete.', 'success');
     }
     
-    await new Promise(r => setTimeout(r, 2000));
-    addLog('Analysis: Kotlin project detected. build.gradle (8.2.0) compatible.', 'info');
+    await new Promise(r => setTimeout(r, 1000));
+    addLog('Project analysis: Kotlin DSL detected. Gradle 8.2 compatible.', 'info');
     
     setStatus(SystemStatus.BUILDING);
-    addLog('Executing command: ./gradlew assembleDebug', 'info');
+    addLog('Executing build command: ./gradlew assembleDebug --no-daemon', 'info');
     await new Promise(r => setTimeout(r, 3000));
     
-    // Simulate Build Failure
-    addLog('Build FAILED: Namespace not found in AndroidManifest.xml or build.gradle', 'error');
-    addLog('Execution failed for task \':app:processDebugMainManifest\'.', 'error');
+    // Controlled build failure simulation
+    addLog('Build Failure: Task :app:processDebugMainManifest failed.', 'error');
+    addLog('Error: namespace not specified in the module\'s build.gradle file.', 'error');
     
     setStatus(SystemStatus.SELF_HEALING);
-    addLog('Invoking Autonomous Self-Healing AI Engine...', 'ai');
+    addLog('✦ Autonomous Agent: Initiating error analysis & self-healing...', 'ai');
     
     try {
-      const errorSample = `FAILURE: Build failed with an exception.
-* What went wrong:
-Execution failed for task ':app:processDebugMainManifest'.
-> Namespace not specified. Please specify a namespace in the module's build.gradle file like so:
-  android {
-      namespace 'com.example.app'
-  }`;
+      // Mock error log for Gemini to process
+      const errorLog = `Execution failed for task ':app:processDebugMainManifest'.
+> Namespace not specified. Please specify a namespace in the module's build.gradle file.`;
       
-      const analysis = await analyzeBuildError(errorSample);
-      addLog(`AI Analysis: ${analysis.issueDescription}`, 'ai');
-      addLog(`Root Cause: ${analysis.rootCause}`, 'ai');
-      addLog(`Applying Fix to ${analysis.affectedFile}...`, 'warning');
+      const analysis = await analyzeBuildError(errorLog);
+      addLog(`✦ Agent Reasoning: ${analysis.issueDescription}`, 'ai');
+      addLog(`✦ Root Cause: ${analysis.rootCause}`, 'ai');
+      addLog(`Patching file: ${analysis.affectedFile}...`, 'warning');
       
-      await new Promise(r => setTimeout(r, 2000));
+      await new Promise(r => setTimeout(r, 1500));
       addLog('Retrying build with patched configuration...', 'info');
       
-      await new Promise(r => setTimeout(r, 3000));
-      addLog('Build SUCCESSFUL: Generated app-debug.apk (3.4MB)', 'success');
+      await new Promise(r => setTimeout(r, 2500));
+      addLog('Build SUCCESSFUL: APK generated at app/build/outputs/apk/debug/app-debug.apk', 'success');
       
       setStatus(SystemStatus.TESTING);
-      addLog('Booting AVD TestDevice...', 'info');
-      await new Promise(r => setTimeout(r, 4000));
-      addLog('Installing APK via adb install...', 'info');
-      await new Promise(r => setTimeout(r, 2000));
-      addLog('Launching MainActivity...', 'info');
+      addLog('Synchronizing with AVD "TestDevice"...', 'info');
+      await new Promise(r => setTimeout(r, 3000));
+      addLog('Pushing APK to simulator filesystem...', 'info');
       await new Promise(r => setTimeout(r, 1500));
-      addLog('Validation: App launched successfully. No crashes found.', 'success');
+      addLog('Installing package via ADB...', 'info');
+      await new Promise(r => setTimeout(r, 1500));
+      addLog('Invoking primary Activity intent...', 'info');
+      await new Promise(r => setTimeout(r, 1000));
+      addLog('Smoke test passed. App is stable.', 'success');
       
       setStatus(SystemStatus.COMPLETED);
-      addLog('Deployment pipeline finished.', 'success');
+      addLog('Pipeline completed successfully. APK verified.', 'success');
 
       try {
-        addLog('Generating stand-alone self-healing script for local use...', 'info');
         const script = await generateSelfHealingPythonScript();
         setSelfHealingScript(script);
-        addLog('Self-healing script generated successfully.', 'success');
+        addLog('Stand-alone Python Self-Healing script generated for export.', 'success');
       } catch (scriptErr) {
-        addLog('Warning: Could not generate Python script for download, but build was successful.', 'warning');
+        addLog('Note: Local export script generation skipped (API constraint).', 'warning');
       }
 
-    } catch (err) {
-      addLog('Self-healing failed due to AI API error.', 'error');
+    } catch (err: any) {
+      addLog(`Self-healing interrupted: ${err.message}`, 'error');
       setStatus(SystemStatus.FAILED);
     }
   };
@@ -161,125 +166,138 @@ Execution failed for task ':app:processDebugMainManifest'.
   return (
     <div className="flex h-screen overflow-hidden bg-[#0c0c0e]">
       {/* Sidebar */}
-      <aside className="w-64 bg-[#121214] border-r border-zinc-800 flex flex-col">
+      <aside className="w-64 bg-[#121214] border-r border-zinc-800 flex flex-col z-20 shadow-2xl">
         <div className="p-6 border-b border-zinc-800">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-600/20">
-              <Layers className="w-5 h-5 text-white" />
+            <div className="w-8 h-8 bg-cyan-600 rounded-lg flex items-center justify-center shadow-lg shadow-cyan-600/30">
+              <Cpu className="w-5 h-5 text-white" />
             </div>
-            <h1 className="font-bold tracking-tight text-white">AI ENGINEER</h1>
+            <div>
+              <h1 className="font-bold tracking-tight text-white text-sm leading-tight">AI ENGINEER</h1>
+              <p className="text-[9px] text-zinc-500 font-bold tracking-widest uppercase">Autonomous Android</p>
+            </div>
           </div>
         </div>
 
         <nav className="flex-1 p-4 space-y-1">
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-white bg-zinc-800 rounded-lg">
-            <Cpu className="w-4 h-4 text-cyan-400" />
-            Dashboard
+          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-white bg-zinc-800/50 border border-zinc-700/50 rounded-lg">
+            <Layers className="w-4 h-4 text-cyan-400" />
+            Infrastructure
           </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
+          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
+            <TerminalIcon className="w-4 h-4" />
+            Build Context
+          </button>
+          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-500 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
             <Box className="w-4 h-4" />
-            Environments
-          </button>
-          <button className="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
-            <Code className="w-4 h-4" />
-            Build Logs
+            Artifacts
           </button>
         </nav>
 
         <div className="p-4 mt-auto border-t border-zinc-800">
           <div className="bg-zinc-900/50 rounded-xl p-4 border border-zinc-800/50">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-3">Provisioning Status</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-500 font-bold mb-3">Cloud Status</p>
             <div className="space-y-2">
+              <StatusBadge label="Java 17 Runtime" active={provisioning.java} />
               <StatusBadge label="Android Studio" active={provisioning.androidStudio} />
-              <StatusBadge label="Java 17 JDK" active={provisioning.java} />
-              <StatusBadge label="SDK Platform" active={provisioning.sdk} />
-              <StatusBadge label="TestDevice AVD" active={provisioning.avd} />
+              <StatusBadge label="SDK Pipeline" active={provisioning.sdk} />
+              <StatusBadge label="VNC / Simulator" active={provisioning.avd} />
             </div>
           </div>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-y-auto p-8 relative">
-        <header className="flex justify-between items-center mb-8">
+      <main className="flex-1 overflow-y-auto p-8 relative scroll-smooth">
+        <header className="flex justify-between items-start mb-8">
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Autonomous Pipeline</h2>
-            <p className="text-zinc-500 text-sm">Orchestrating OS, Code, and Emulation layers</p>
+            <h2 className="text-3xl font-extrabold text-white mb-2 tracking-tight">Android CI Pipeline</h2>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+              <p className="text-zinc-500 text-xs font-medium uppercase tracking-wider">Active Workspace: Linux Cloud VPS</p>
+            </div>
           </div>
           <div className="flex gap-3">
-            {!provisioning.avd && (
+            {!provisioning.avd ? (
               <button 
                 onClick={runProvisioning}
-                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 transition-all"
+                className="px-5 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all transform hover:-translate-y-0.5 shadow-xl shadow-cyan-600/30"
               >
-                <Zap className="w-4 h-4 text-yellow-500" />
-                Initialize Environment
+                <Zap className="w-4 h-4 fill-current" />
+                Initialize OS Stack
+              </button>
+            ) : (
+              <button 
+                onClick={() => {
+                  setLogs([]);
+                  setStatus(SystemStatus.IDLE);
+                  setSelfHealingScript(null);
+                  setProjectUrl('');
+                  setSelectedFile(null);
+                }}
+                className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium flex items-center gap-2 border border-zinc-700"
+              >
+                <RefreshCw className="w-4 h-4" />
+                Flush Pipeline
               </button>
             )}
-            <button 
-              onClick={() => {
-                setLogs([]);
-                setStatus(SystemStatus.IDLE);
-                setSelfHealingScript(null);
-                setProjectUrl('');
-                setSelectedFile(null);
-              }}
-              className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Reset
-            </button>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Input and Terminal */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-20">
+          {/* Left Column */}
           <div className="lg:col-span-2 space-y-8">
-            <div className="bg-[#121214] border border-zinc-800 rounded-xl p-6 shadow-xl">
-              <div className="flex items-center justify-between mb-4">
-                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest">Project Source</label>
-                <div className="flex bg-black/40 p-1 rounded-lg border border-zinc-800">
+            <div className="bg-[#121214] border border-zinc-800 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4 opacity-5">
+                <FileArchive className="w-32 h-32" />
+              </div>
+              
+              <div className="flex items-center justify-between mb-6">
+                <label className="block text-[10px] font-black text-zinc-500 uppercase tracking-[0.2em]">Project Injection Point</label>
+                <div className="flex bg-black/50 p-1 rounded-xl border border-zinc-800/50">
                   <button 
                     onClick={() => setInputMode('url')}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold flex items-center gap-2 transition-all ${inputMode === 'url' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`px-4 py-2 rounded-lg text-[11px] font-bold flex items-center gap-2 transition-all ${inputMode === 'url' ? 'bg-zinc-700 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     <LinkIcon className="w-3 h-3" />
-                    URL
+                    REPOSITORY URL
                   </button>
                   <button 
                     onClick={() => setInputMode('upload')}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold flex items-center gap-2 transition-all ${inputMode === 'upload' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                    className={`px-4 py-2 rounded-lg text-[11px] font-bold flex items-center gap-2 transition-all ${inputMode === 'upload' ? 'bg-zinc-700 text-white shadow-lg' : 'text-zinc-500 hover:text-zinc-300'}`}
                   >
                     <Upload className="w-3 h-3" />
-                    ZIP UPLOAD
+                    LOCAL ARCHIVE
                   </button>
                 </div>
               </div>
 
-              <div className="flex flex-col gap-4">
+              <div className="relative z-10">
                 {inputMode === 'url' ? (
                   <div className="flex gap-3">
-                    <input 
-                      type="text" 
-                      value={projectUrl}
-                      onChange={(e) => setProjectUrl(e.target.value)}
-                      placeholder="Paste GitHub URL (e.g. https://github.com/user/repo)..."
-                      className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                    />
+                    <div className="flex-1 relative">
+                      <input 
+                        type="text" 
+                        value={projectUrl}
+                        onChange={(e) => setProjectUrl(e.target.value)}
+                        placeholder="https://github.com/android/project-samples..."
+                        className="w-full bg-zinc-900/80 border border-zinc-800 rounded-xl px-5 py-4 text-sm text-zinc-200 focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-all placeholder:text-zinc-600"
+                      />
+                    </div>
                     <button 
                       onClick={startPipeline}
                       disabled={status !== SystemStatus.IDLE || !provisioning.avd}
-                      className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-cyan-600/20"
+                      className="px-8 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-800 disabled:text-zinc-600 disabled:cursor-not-allowed text-white rounded-xl text-sm font-black flex items-center gap-2 transition-all shadow-xl shadow-cyan-600/20 active:scale-95"
                     >
                       <Play className="w-4 h-4 fill-current" />
-                      BUILD APK
+                      DEPLOY
                     </button>
                   </div>
                 ) : (
-                  <div className="flex flex-col gap-3">
+                  <div className="space-y-4">
                     <div 
                       onClick={() => fileInputRef.current?.click()}
-                      className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer ${selectedFile ? 'border-cyan-500/50 bg-cyan-500/5' : 'border-zinc-800 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900/50'}`}
+                      className={`group border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center gap-4 transition-all cursor-pointer ${selectedFile ? 'border-cyan-500/50 bg-cyan-500/5 shadow-inner' : 'border-zinc-800 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900/50'}`}
                     >
                       <input 
                         type="file" 
@@ -289,35 +307,39 @@ Execution failed for task ':app:processDebugMainManifest'.
                         accept=".zip"
                       />
                       {selectedFile ? (
-                        <div className="flex flex-col items-center animate-fade-in">
-                          <FileArchive className="w-12 h-12 text-cyan-400 mb-2" />
-                          <span className="text-white font-medium text-sm">{selectedFile.name}</span>
-                          <span className="text-zinc-500 text-xs">Ready for build</span>
+                        <div className="flex flex-col items-center animate-fade-in text-center">
+                          <div className="w-16 h-16 bg-cyan-500/10 rounded-2xl flex items-center justify-center mb-3">
+                            <FileArchive className="w-8 h-8 text-cyan-400" />
+                          </div>
+                          <span className="text-white font-bold text-base truncate max-w-[300px]">{selectedFile.name}</span>
+                          <span className="text-zinc-500 text-xs mt-1">Ready for autonomous build process</span>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
-                            className="mt-4 p-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                            onClick={(e) => { e.stopPropagation(); setSelectedFile(null); if(fileInputRef.current) fileInputRef.current.value = ''; }}
+                            className="mt-4 flex items-center gap-2 px-3 py-1.5 rounded-full bg-zinc-800 hover:bg-red-500/20 hover:text-red-400 text-zinc-500 transition-all text-[10px] font-bold"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3 h-3" /> REMOVE FILE
                           </button>
                         </div>
                       ) : (
                         <>
-                          <Upload className="w-10 h-10 text-zinc-700" />
+                          <div className="w-16 h-16 bg-zinc-800 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                            <Upload className="w-8 h-8 text-zinc-600" />
+                          </div>
                           <div className="text-center">
-                            <p className="text-sm font-medium text-zinc-400">Click or drag ZIP file here</p>
-                            <p className="text-xs text-zinc-600 mt-1">Accepts Android Project archives (.zip)</p>
+                            <p className="text-sm font-bold text-zinc-400">Drag & drop project .zip</p>
+                            <p className="text-[11px] text-zinc-600 mt-1 uppercase tracking-wider font-mono">Max size: 100MB • Local Upload</p>
                           </div>
                         </>
                       )}
                     </div>
-                    {selectedFile && (
+                    {selectedFile && status === SystemStatus.IDLE && (
                       <button 
                         onClick={startPipeline}
-                        disabled={status !== SystemStatus.IDLE || !provisioning.avd}
-                        className="w-full px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-600/20"
+                        disabled={!provisioning.avd}
+                        className="w-full py-4 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-800 text-white rounded-xl text-sm font-black flex items-center justify-center gap-3 transition-all shadow-2xl shadow-cyan-600/20 active:scale-[0.98]"
                       >
-                        <Play className="w-4 h-4 fill-current" />
-                        START ANDROID BUILD PIPELINE
+                        <Zap className="w-5 h-5 fill-current" />
+                        START ANDROID ENGINE
                       </button>
                     )}
                   </div>
@@ -325,77 +347,125 @@ Execution failed for task ':app:processDebugMainManifest'.
               </div>
             </div>
 
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <TerminalIcon className="w-5 h-5 text-cyan-400" />
-                  <h3 className="font-semibold text-white">Live Execution Logs</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-zinc-800 flex items-center justify-center">
+                    <TerminalIcon className="w-4 h-4 text-cyan-400" />
+                  </div>
+                  <h3 className="font-bold text-white tracking-tight">System Telemetry</h3>
                 </div>
-                <div className="text-[10px] text-zinc-500 font-mono">STDOUT / STDERR</div>
+                <div className="flex gap-2">
+                  <div className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-500">BAUD 115200</div>
+                  <div className="px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[9px] font-mono text-zinc-500">UTF-8</div>
+                </div>
               </div>
               <Terminal logs={logs} />
             </div>
 
             {selfHealingScript && (
-              <div className="bg-[#121214] border border-cyan-900/30 rounded-xl p-6 shadow-xl border-l-4 border-l-cyan-500">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <Zap className="w-5 h-5 text-cyan-400" />
-                    <h3 className="font-semibold text-white">Generated Self-Healing Logic (Python)</h3>
+              <div className="bg-[#121214] border border-cyan-500/20 rounded-2xl p-8 shadow-2xl border-l-4 border-l-cyan-500 animate-fade-in">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-cyan-500/10 rounded-xl flex items-center justify-center">
+                      <Code className="w-6 h-6 text-cyan-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-white text-lg">Self-Healing Module Export</h3>
+                      <p className="text-xs text-zinc-500">Autonomous Python Logic for Local CI/CD</p>
+                    </div>
                   </div>
                   <button 
-                    onClick={() => navigator.clipboard.writeText(selfHealingScript)}
-                    className="text-xs text-cyan-400 hover:underline"
+                    onClick={() => {
+                      navigator.clipboard.writeText(selfHealingScript);
+                      addLog('Script copied to clipboard.', 'info');
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-cyan-600/10 text-cyan-400 hover:bg-cyan-600/20 rounded-lg text-xs font-bold transition-all"
                   >
-                    Copy Code
+                    COPY CODE
                   </button>
                 </div>
-                <pre className="mono text-[11px] text-cyan-100/70 p-4 bg-black/40 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed border border-zinc-800">
-                  {selfHealingScript}
-                </pre>
+                <div className="relative group">
+                  <pre className="mono text-[12px] text-cyan-100/60 p-6 bg-black/40 rounded-xl overflow-x-auto whitespace-pre-wrap leading-relaxed border border-zinc-800/50 max-h-[400px]">
+                    {selfHealingScript}
+                  </pre>
+                  <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <span className="text-[10px] bg-black/80 px-2 py-1 rounded text-zinc-500 font-mono">PYTHON 3.10+</span>
+                  </div>
+                </div>
               </div>
             )}
           </div>
 
-          {/* Right: Simulator and Results */}
+          {/* Right Column */}
           <div className="space-y-8">
-            <div className="bg-[#121214] border border-zinc-800 rounded-xl p-6 shadow-xl h-full flex flex-col">
-              <div className="flex items-center gap-2 mb-6">
-                <Smartphone className="w-5 h-5 text-zinc-400" />
-                <h3 className="font-semibold text-white">Emulator Live Stream</h3>
+            <div className="bg-[#121214] border border-zinc-800 rounded-2xl p-6 shadow-2xl h-full flex flex-col min-h-[700px]">
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <Smartphone className="w-5 h-5 text-zinc-400" />
+                  <h3 className="font-bold text-white tracking-tight">AVD Stream</h3>
+                </div>
+                {status === SystemStatus.IDLE ? (
+                   <span className="text-[10px] text-zinc-600 font-bold uppercase tracking-widest bg-zinc-900 px-2 py-1 rounded">Standby</span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-[10px] text-red-500 font-bold uppercase tracking-widest bg-red-500/10 px-2 py-1 rounded">
+                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                    Live Feed
+                  </span>
+                )}
               </div>
-              <div className="flex-1 bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 flex items-center justify-center min-h-[500px]">
+              
+              <div className="flex-1 bg-zinc-900/50 rounded-2xl overflow-hidden border border-zinc-800/50 flex items-center justify-center p-4">
                 <SimulatorView status={status} />
               </div>
               
-              {status === SystemStatus.COMPLETED && (
-                <div className="mt-6 pt-6 border-t border-zinc-800">
-                  <button className="w-full bg-green-600 hover:bg-green-500 text-white rounded-lg py-4 font-bold flex items-center justify-center gap-3 transition-all shadow-lg shadow-green-600/20">
-                    <Download className="w-5 h-5" />
-                    DOWNLOAD FINAL APK
-                  </button>
-                  <p className="text-center text-[10px] text-zinc-500 mt-3 font-mono uppercase tracking-widest">Signed & Verified v1.0.4</p>
-                </div>
-              )}
+              <div className="mt-8 space-y-4">
+                {status === SystemStatus.COMPLETED ? (
+                  <div className="animate-fade-in">
+                    <button className="w-full bg-green-600 hover:bg-green-500 text-white rounded-xl py-5 font-black text-sm flex items-center justify-center gap-3 transition-all transform hover:-translate-y-1 shadow-2xl shadow-green-600/40">
+                      <Download className="w-5 h-5" />
+                      DOWNLOAD app-debug.apk
+                    </button>
+                    <p className="text-center text-[10px] text-zinc-500 mt-4 font-mono uppercase tracking-[0.3em]">Build Hash: SHA-256: 9E1B...F02A</p>
+                  </div>
+                ) : status === SystemStatus.FAILED ? (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 flex items-start gap-3 animate-fade-in">
+                    <AlertTriangle className="w-5 h-5 text-red-500 shrink-0" />
+                    <div>
+                      <p className="text-xs font-bold text-red-400 uppercase tracking-wider mb-1">Pipeline Fault</p>
+                      <p className="text-[11px] text-red-200/60 leading-relaxed">Agent encountered an unrecoverable state. Check logs for details.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-zinc-900/50 rounded-xl border border-zinc-800/50 border-dashed text-center">
+                    <p className="text-[10px] text-zinc-600 font-bold uppercase tracking-[0.2em]">Awaiting Valid Artifact</p>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
       </main>
 
-      {/* Floating Status Indicator */}
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-[#18181b]/90 backdrop-blur border border-zinc-700 rounded-full flex items-center gap-4 shadow-2xl z-50">
-        <div className="flex items-center gap-2">
-          <div className={`w-2 h-2 rounded-full ${status === SystemStatus.IDLE ? 'bg-zinc-500' : 'bg-cyan-500 animate-pulse'}`}></div>
-          <span className="text-xs font-bold text-white uppercase tracking-widest">{status}</span>
+      {/* Footer Status Bar */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 px-8 py-4 bg-[#18181b]/95 backdrop-blur-xl border border-white/10 rounded-2xl flex items-center gap-6 shadow-[0_20px_50px_rgba(0,0,0,0.5)] z-50">
+        <div className="flex items-center gap-3">
+          <div className={`w-3 h-3 rounded-full shadow-[0_0_10px] ${
+            status === SystemStatus.IDLE ? 'bg-zinc-500 shadow-zinc-500/20' : 
+            status === SystemStatus.COMPLETED ? 'bg-green-500 shadow-green-500/50' : 
+            status === SystemStatus.FAILED ? 'bg-red-500 shadow-red-500/50' : 
+            'bg-cyan-500 shadow-cyan-500/50 animate-pulse'
+          }`}></div>
+          <span className="text-[11px] font-black text-white uppercase tracking-[0.15em]">{status}</span>
         </div>
-        <div className="w-px h-4 bg-zinc-700"></div>
-        <div className="text-xs text-zinc-400 font-medium">
-          {status === SystemStatus.IDLE && "System Idle"}
-          {status === SystemStatus.PROVISIONING && "Deploying cloud tools..."}
-          {status === SystemStatus.BUILDING && "Compiling project..."}
-          {status === SystemStatus.SELF_HEALING && "AI Fixing Build Errors..."}
-          {status === SystemStatus.COMPLETED && "App Verified & Ready"}
-          {status === SystemStatus.FAILED && "Pipeline Interrupted"}
+        <div className="w-px h-6 bg-white/10"></div>
+        <div className="text-[11px] text-zinc-400 font-bold tracking-tight">
+          {status === SystemStatus.IDLE && "Ready for project deployment."}
+          {status === SystemStatus.PROVISIONING && "Virtualizing hardware layers..."}
+          {status === SystemStatus.BUILDING && "Compiling bytecode dependencies..."}
+          {status === SystemStatus.SELF_HEALING && "AI executing patch sub-routines..."}
+          {status === SystemStatus.COMPLETED && "Binary verified in simulator environment."}
+          {status === SystemStatus.FAILED && "Pipeline terminated with errors."}
         </div>
       </div>
     </div>
@@ -404,11 +474,14 @@ Execution failed for task ':app:processDebugMainManifest'.
 
 const StatusBadge: React.FC<{ label: string; active: boolean }> = ({ label, active }) => (
   <div className="flex items-center justify-between">
-    <span className="text-xs text-zinc-400">{label}</span>
+    <span className="text-[11px] font-medium text-zinc-500">{label}</span>
     {active ? (
-      <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+      <div className="flex items-center gap-1">
+        <span className="text-[9px] font-bold text-green-500 mr-1 uppercase">Ready</span>
+        <CheckCircle className="w-3.5 h-3.5 text-green-500" />
+      </div>
     ) : (
-      <div className="w-3 h-3 rounded-full border border-zinc-700"></div>
+      <div className="w-3.5 h-3.5 rounded-full border border-zinc-800"></div>
     )}
   </div>
 );
