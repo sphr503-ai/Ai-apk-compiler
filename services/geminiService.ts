@@ -11,7 +11,10 @@ const getApiKey = () => {
 };
 
 export const analyzeBuildError = async (errorLog: string) => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API_KEY not found in environment");
+
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `As an autonomous Android Software Engineer, analyze this build error and provide a fix.
@@ -40,21 +43,32 @@ export const analyzeBuildError = async (errorLog: string) => {
 };
 
 export const generateSelfHealingPythonScript = async () => {
-  const ai = new GoogleGenAI({ apiKey: getApiKey() });
-  const prompt = `Generate a high-level Python script that handles the "Self-Healing" build logic for an Android project. 
-  The script should:
-  1. Execute ./gradlew assembleDebug and capture stdout/stderr.
-  2. If return code != 0, extract the error.
-  3. Placeholder for calling an LLM API to get the fix.
-  4. Apply the suggested fix to the source file.
-  5. Retry the build up to 3 times.
-  
-  Format the output as a clean Python script. Do not use markdown blocks, just the code.`;
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API_KEY not found in environment");
+
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `Act as an expert Android DevOps engineer. Generate a production-ready Python script that implements an autonomous "Self-Healing" build pipeline.
+
+The script must:
+1. Attempt to build an Android project using './gradlew assembleDebug'.
+2. Capture stdout and stderr of the process.
+3. If the build fails, parse the error output.
+4. Include a robust retry loop (maximum 3 attempts).
+5. Add a clear placeholder comment for where an LLM (like Gemini) would be invoked to analyze the build error and suggest file modifications.
+6. Use standard Python libraries (os, subprocess, sys).
+7. Be well-commented and clean.
+
+Output ONLY the Python code. No introductory text or markdown formatting.`;
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-pro-preview',
     contents: prompt
   });
 
-  return response.text;
+  if (!response.text) {
+    throw new Error("Empty response from AI");
+  }
+
+  // Basic cleanup in case markdown blocks were added despite instructions
+  return response.text.replace(/```python/g, '').replace(/```/g, '').trim();
 };

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { SystemStatus, LogEntry, ProvisioningState } from './types.ts';
 import { Terminal } from './components/Terminal.tsx';
 import { SimulatorView } from './components/SimulatorView.tsx';
@@ -15,7 +15,11 @@ import {
   Code,
   Zap,
   RefreshCw,
-  Box
+  Box,
+  Upload,
+  Link as LinkIcon,
+  FileArchive,
+  X
 } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -28,7 +32,11 @@ const App: React.FC = () => {
     avd: false
   });
   const [projectUrl, setProjectUrl] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [inputMode, setInputMode] = useState<'url' | 'upload'>('url');
   const [selfHealingScript, setSelfHealingScript] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const addLog = useCallback((message: string, type: LogEntry['type'] = 'info') => {
     setLogs(prev => [...prev, {
@@ -62,16 +70,34 @@ const App: React.FC = () => {
     addLog('System ready for project input.', 'info');
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && file.name.endsWith('.zip')) {
+      setSelectedFile(file);
+      addLog(`File selected: ${file.name} (${(file.size / 1024 / 1024).toFixed(2)} MB)`, 'info');
+    } else if (file) {
+      addLog('Error: Please select a valid .zip project archive.', 'error');
+    }
+  };
+
   const startPipeline = async () => {
-    if (!projectUrl) {
-      addLog('Error: Please provide a Project URL or ZIP.', 'error');
+    if (inputMode === 'url' && !projectUrl) {
+      addLog('Error: Please provide a Project URL.', 'error');
+      return;
+    }
+    if (inputMode === 'upload' && !selectedFile) {
+      addLog('Error: Please upload a ZIP project archive.', 'error');
       return;
     }
 
     setStatus(SystemStatus.ANALYZING);
-    addLog(`Cloning repository: ${projectUrl}`, 'info');
-    await new Promise(r => setTimeout(r, 2000));
+    if (inputMode === 'url') {
+      addLog(`Cloning repository: ${projectUrl}`, 'info');
+    } else {
+      addLog(`Unpacking archive: ${selectedFile?.name}`, 'info');
+    }
     
+    await new Promise(r => setTimeout(r, 2000));
     addLog('Analysis: Kotlin project detected. build.gradle (8.2.0) compatible.', 'info');
     
     setStatus(SystemStatus.BUILDING);
@@ -117,12 +143,17 @@ Execution failed for task ':app:processDebugMainManifest'.
       setStatus(SystemStatus.COMPLETED);
       addLog('Deployment pipeline finished.', 'success');
 
-      // Fetch the python script to show the user
-      const script = await generateSelfHealingPythonScript();
-      setSelfHealingScript(script);
+      try {
+        addLog('Generating stand-alone self-healing script for local use...', 'info');
+        const script = await generateSelfHealingPythonScript();
+        setSelfHealingScript(script);
+        addLog('Self-healing script generated successfully.', 'success');
+      } catch (scriptErr) {
+        addLog('Warning: Could not generate Python script for download, but build was successful.', 'warning');
+      }
 
     } catch (err) {
-      addLog('Self-healing failed due to API error.', 'error');
+      addLog('Self-healing failed due to AI API error.', 'error');
       setStatus(SystemStatus.FAILED);
     }
   };
@@ -190,6 +221,8 @@ Execution failed for task ':app:processDebugMainManifest'.
                 setLogs([]);
                 setStatus(SystemStatus.IDLE);
                 setSelfHealingScript(null);
+                setProjectUrl('');
+                setSelectedFile(null);
               }}
               className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-sm font-medium flex items-center gap-2"
             >
@@ -203,23 +236,92 @@ Execution failed for task ':app:processDebugMainManifest'.
           {/* Left: Input and Terminal */}
           <div className="lg:col-span-2 space-y-8">
             <div className="bg-[#121214] border border-zinc-800 rounded-xl p-6 shadow-xl">
-              <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest mb-4">Project Source</label>
-              <div className="flex gap-3">
-                <input 
-                  type="text" 
-                  value={projectUrl}
-                  onChange={(e) => setProjectUrl(e.target.value)}
-                  placeholder="Paste GitHub URL or Drag ZIP file here..."
-                  className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
-                />
-                <button 
-                  onClick={startPipeline}
-                  disabled={status !== SystemStatus.IDLE || !provisioning.avd}
-                  className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-cyan-600/20"
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  BUILD APK
-                </button>
+              <div className="flex items-center justify-between mb-4">
+                <label className="block text-xs font-bold text-zinc-500 uppercase tracking-widest">Project Source</label>
+                <div className="flex bg-black/40 p-1 rounded-lg border border-zinc-800">
+                  <button 
+                    onClick={() => setInputMode('url')}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold flex items-center gap-2 transition-all ${inputMode === 'url' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    <LinkIcon className="w-3 h-3" />
+                    URL
+                  </button>
+                  <button 
+                    onClick={() => setInputMode('upload')}
+                    className={`px-3 py-1.5 rounded-md text-[10px] font-bold flex items-center gap-2 transition-all ${inputMode === 'upload' ? 'bg-zinc-700 text-white' : 'text-zinc-500 hover:text-zinc-300'}`}
+                  >
+                    <Upload className="w-3 h-3" />
+                    ZIP UPLOAD
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-4">
+                {inputMode === 'url' ? (
+                  <div className="flex gap-3">
+                    <input 
+                      type="text" 
+                      value={projectUrl}
+                      onChange={(e) => setProjectUrl(e.target.value)}
+                      placeholder="Paste GitHub URL (e.g. https://github.com/user/repo)..."
+                      className="flex-1 bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-3 text-sm text-zinc-300 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
+                    />
+                    <button 
+                      onClick={startPipeline}
+                      disabled={status !== SystemStatus.IDLE || !provisioning.avd}
+                      className="px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-lg shadow-cyan-600/20"
+                    >
+                      <Play className="w-4 h-4 fill-current" />
+                      BUILD APK
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex flex-col gap-3">
+                    <div 
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`border-2 border-dashed rounded-xl p-8 flex flex-col items-center justify-center gap-3 transition-all cursor-pointer ${selectedFile ? 'border-cyan-500/50 bg-cyan-500/5' : 'border-zinc-800 bg-zinc-900/30 hover:border-zinc-700 hover:bg-zinc-900/50'}`}
+                    >
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        onChange={handleFileChange} 
+                        className="hidden" 
+                        accept=".zip"
+                      />
+                      {selectedFile ? (
+                        <div className="flex flex-col items-center animate-fade-in">
+                          <FileArchive className="w-12 h-12 text-cyan-400 mb-2" />
+                          <span className="text-white font-medium text-sm">{selectedFile.name}</span>
+                          <span className="text-zinc-500 text-xs">Ready for build</span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                            className="mt-4 p-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <>
+                          <Upload className="w-10 h-10 text-zinc-700" />
+                          <div className="text-center">
+                            <p className="text-sm font-medium text-zinc-400">Click or drag ZIP file here</p>
+                            <p className="text-xs text-zinc-600 mt-1">Accepts Android Project archives (.zip)</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    {selectedFile && (
+                      <button 
+                        onClick={startPipeline}
+                        disabled={status !== SystemStatus.IDLE || !provisioning.avd}
+                        className="w-full px-6 py-3 bg-cyan-600 hover:bg-cyan-500 disabled:bg-zinc-700 disabled:cursor-not-allowed text-white rounded-lg text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-lg shadow-cyan-600/20"
+                      >
+                        <Play className="w-4 h-4 fill-current" />
+                        START ANDROID BUILD PIPELINE
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -241,9 +343,14 @@ Execution failed for task ':app:processDebugMainManifest'.
                     <Zap className="w-5 h-5 text-cyan-400" />
                     <h3 className="font-semibold text-white">Generated Self-Healing Logic (Python)</h3>
                   </div>
-                  <button className="text-xs text-cyan-400 hover:underline">Copy Code</button>
+                  <button 
+                    onClick={() => navigator.clipboard.writeText(selfHealingScript)}
+                    className="text-xs text-cyan-400 hover:underline"
+                  >
+                    Copy Code
+                  </button>
                 </div>
-                <pre className="mono text-xs text-cyan-100/70 p-4 bg-black/40 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed border border-zinc-800">
+                <pre className="mono text-[11px] text-cyan-100/70 p-4 bg-black/40 rounded-lg overflow-x-auto whitespace-pre-wrap leading-relaxed border border-zinc-800">
                   {selfHealingScript}
                 </pre>
               </div>
@@ -257,7 +364,7 @@ Execution failed for task ':app:processDebugMainManifest'.
                 <Smartphone className="w-5 h-5 text-zinc-400" />
                 <h3 className="font-semibold text-white">Emulator Live Stream</h3>
               </div>
-              <div className="flex-1 bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 flex items-center justify-center">
+              <div className="flex-1 bg-zinc-900/50 rounded-xl overflow-hidden border border-zinc-800 flex items-center justify-center min-h-[500px]">
                 <SimulatorView status={status} />
               </div>
               
@@ -267,7 +374,7 @@ Execution failed for task ':app:processDebugMainManifest'.
                     <Download className="w-5 h-5" />
                     DOWNLOAD FINAL APK
                   </button>
-                  <p className="text-center text-[10px] text-zinc-500 mt-3">Verified by Autonomous Engine v1.0.4</p>
+                  <p className="text-center text-[10px] text-zinc-500 mt-3 font-mono uppercase tracking-widest">Signed & Verified v1.0.4</p>
                 </div>
               )}
             </div>
@@ -276,7 +383,7 @@ Execution failed for task ':app:processDebugMainManifest'.
       </main>
 
       {/* Floating Status Indicator */}
-      <div className="absolute bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-[#18181b]/90 backdrop-blur border border-zinc-700 rounded-full flex items-center gap-4 shadow-2xl z-50">
+      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 px-6 py-3 bg-[#18181b]/90 backdrop-blur border border-zinc-700 rounded-full flex items-center gap-4 shadow-2xl z-50">
         <div className="flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${status === SystemStatus.IDLE ? 'bg-zinc-500' : 'bg-cyan-500 animate-pulse'}`}></div>
           <span className="text-xs font-bold text-white uppercase tracking-widest">{status}</span>
@@ -288,6 +395,7 @@ Execution failed for task ':app:processDebugMainManifest'.
           {status === SystemStatus.BUILDING && "Compiling project..."}
           {status === SystemStatus.SELF_HEALING && "AI Fixing Build Errors..."}
           {status === SystemStatus.COMPLETED && "App Verified & Ready"}
+          {status === SystemStatus.FAILED && "Pipeline Interrupted"}
         </div>
       </div>
     </div>
