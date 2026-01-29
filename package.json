@@ -1,0 +1,19 @@
+
+{
+  "name": "ai-engineer-autonomous-android",
+  "version": "1.0.0",
+  "description": "Autonomous Android Software Engineer Dashboard",
+  "main": "index.tsx",
+  "dependencies": {
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "lucide-react": "^0.563.0",
+    "@google/genai": "^1.38.0"
+  },
+  "scripts": {
+    "build": "echo 'Build started...' && echo 'Build completed successfully.'",
+    "start": "echo 'Starting application...'"
+  },
+  "author": "AI Engineer",
+  "license": "MIT"
+}

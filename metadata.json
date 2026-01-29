@@ -1,0 +1,8 @@
+{
+  "name": "AI Engineer: Autonomous Android Builder",
+  "description": "An autonomous software engineering dashboard for provisioning Android environments, building APKs with self-healing AI logic, and live simulator testing.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}
