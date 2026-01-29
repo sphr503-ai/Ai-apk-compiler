@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { SystemStatus, LogEntry, ProvisioningState, ProjectInfo } from './types';
-import { Terminal } from './components/Terminal';
-import { SimulatorView } from './components/SimulatorView';
-import { analyzeBuildError, generateSelfHealingPythonScript } from './services/geminiService';
+import { SystemStatus, LogEntry, ProvisioningState } from './types.ts';
+import { Terminal } from './components/Terminal.tsx';
+import { SimulatorView } from './components/SimulatorView.tsx';
+import { analyzeBuildError, generateSelfHealingPythonScript } from './services/geminiService.ts';
 import { 
   Cpu, 
   Layers, 
@@ -11,7 +11,6 @@ import {
   Smartphone, 
   Play, 
   CheckCircle, 
-  AlertTriangle,
   Download,
   Code,
   Zap,

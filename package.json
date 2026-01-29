@@ -2,18 +2,11 @@
 {
   "name": "ai-engineer-autonomous-android",
   "version": "1.0.0",
-  "description": "Autonomous Android Software Engineer Dashboard",
-  "main": "index.tsx",
+  "private": true,
   "dependencies": {
-    "react": "^19.2.4",
-    "react-dom": "^19.2.4",
-    "lucide-react": "^0.563.0",
-    "@google/genai": "^1.38.0"
-  },
-  "scripts": {
-    "build": "mkdir -p dist && cp index.html index.tsx App.tsx types.ts metadata.json dist/ && cp -r components services dist/ || true",
-    "start": "echo 'Starting application...'"
-  },
-  "author": "AI Engineer",
-  "license": "MIT"
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "lucide-react": "^0.463.0",
+    "@google/genai": "^0.2.1"
+  }
 }
