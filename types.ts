@@ -22,7 +22,10 @@ export interface ProvisioningState {
   androidStudio: boolean;
   sdk: boolean;
   avd: boolean;
-  ramLimit: number; // in GB
+  systemRam: number; // in GB
+  systemStorage: number; // in GB
+  phoneRam: number; // in GB
+  phoneStorage: number; // in GB
   cpuCores: number;
 }
 
