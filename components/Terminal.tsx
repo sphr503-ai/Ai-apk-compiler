@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef } from 'react';
-import { LogEntry } from '../types';
+import { LogEntry } from '../types.ts';
 
 interface TerminalProps {
   logs: LogEntry[];
@@ -21,8 +21,11 @@ export const Terminal: React.FC<TerminalProps> = ({ logs }) => {
         <div className="w-3 h-3 rounded-full bg-green-500"></div>
         <span className="text-zinc-500 ml-2">autonomous-engine@android-vps: ~</span>
       </div>
+      {logs.length === 0 && (
+        <div className="text-zinc-600 italic">No output yet. Initialize the environment to begin.</div>
+      )}
       {logs.map((log, i) => (
-        <div key={i} className="mb-1 leading-relaxed">
+        <div key={i} className="mb-1 leading-relaxed animate-fade-in">
           <span className="text-zinc-600 mr-2">[{log.timestamp}]</span>
           <span className={
             log.type === 'error' ? 'text-red-400' :
